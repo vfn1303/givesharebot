@@ -1,3 +1,5 @@
+import uvicorn
+
 from telegram.ext import (
     Updater,
     CommandHandler,
@@ -9,6 +11,8 @@ from telegram import ReplyKeyboardMarkup, KeyboardButton
 import sqlite3
 from dotenv import load_dotenv
 import os
+
+
 
 load_dotenv()
 
@@ -29,7 +33,7 @@ def add_user(username, chat_id, subscribed):
         conn.commit()
 
 def add_giveaway(name, desc, image, max, date):
-    cursor.execute("INSERT INTO Giveaways (name, desc, image, max, date) VALUES (?, ?, ?, ?, ?)", (name, desc, image, max, date))
+    cursor.execute("INSERT INTO Giveaways (Giveaway_Name, Giveaway_Desc, Giveaway_Image, Max, End_Date) VALUES (?, ?, ?, ?, ?)", (name, desc, image, int(max), date))
     conn.commit()
 
 # Получение всех пользователей
@@ -144,19 +148,16 @@ def choose_admin(update,context):
     if user_input == 'Отмена':
         cancel(update, context)
         return ConversationHandler.END
-    elif user_input == 'Добавить админа':
+    if user_input == 'Добавить админа':
         update.message.reply_text('Отправьте ник админ без @.')
         return ADD_ADMIN
-    elif user_input == 'Вывести розыгрыши':
+    if user_input == 'Вывести розыгрыши':
         print(str(get_all_giveaways()))
 
         choose_keyboard = [] #обавить все названия розыгрышей в формате [id:]назвние
         choose_markup = ReplyKeyboardMarkup(choose_keyboard)
         update.message.reply_text('Выберите нужный розыгрышь',reply_markup=choose_markup)
         return EDIT_ADMIN
-    else:
-        cancel(update, context)
-        return ConversationHandler.END
 
 def edit_admin(update,context):
     user_input = update.message.text
@@ -371,22 +372,29 @@ def text(update, context):
     
     confirmation_message = f'Подтверждение:\n Описание: {context.user_data["description"]}\n Картинка: {context.user_data["image"]}\n Дата: {context.user_data["date"]}\n Число участников: {context.user_data["number"]}\n Текст: {context.user_data["text"]}'
 
+    
     update.message.reply_text(confirmation_message,reply_markup=markup,disable_web_page_preview=False)
 
-    return ConversationHandler.CONFIRM
+    return ConversationHandler.END
 
 def confirm(update, context):
     user_text = update.message.text
 
     if user_text == 'Сохранить':
         #base
-        add_giveaway(context.user_data["description"],context.user_data["text"],context.user_data["image"],context.user_data["number"],context.user_data["date"])
-        #в крон
-    if user_text == 'Отмена':
-        cancel(update, context)
+        add_giveaway(context.user_data["description"],context.user_data["text"],context.user_data["image"],int(context.user_data["number"]),context.user_data["date"])
 
-    #сюда главное меню пихнуть
-    return ConversationHandler.END
+        update.message.reply_text('все в базе')
+        #в крон
+        #TODO
+        return ConversationHandler.END
+    elif user_text == 'Отмена':
+        cancel(update, context)
+        return ConversationHandler.END
+    else:
+        return TEXT
+
+    
 
 def cancel(update, context):
     update.message.reply_text('Действие отменено.')
@@ -409,7 +417,7 @@ def main():
         Giveaway_Desc VARCHAR(255),
         Giveaway_Image VARCHAR(255),
         Max INT,
-        End_Date DATE,
+        End_Date VARCHAR(255),
         Winner INT DEFAULT 0 
     );"""
 
@@ -431,39 +439,47 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('create_giveaway', create_giveaway)],
         states={
-            BEGIN_GIVEAWAY: [MessageHandler(Filters.text, description)],
+            BEGIN_GIVEAWAY: [MessageHandler(Filters.text, begin_giveaway)],
             DESCRIPTION: [MessageHandler(Filters.text, description)],
             IMAGE: [MessageHandler(Filters.text, image)],
             DATE: [MessageHandler(Filters.text, date)],
             NUMBER: [MessageHandler(Filters.text, number)],
             TEXT: [MessageHandler(Filters.text, text)],
-            CONFIRM: [MessageHandler(Filters.text, text)]
+            CONFIRM: [MessageHandler(Filters.text, confirm)]
         },
         fallbacks=[CommandHandler('cancel', cancel)],
-    run_async=True  
     )
     dp.add_handler(conv_handler)
 
     adm_handler = ConversationHandler(
         entry_points=[CommandHandler('admin', admin)],
         states={
-            CHOOSE_ADMIN: [MessageHandler(Filters.text, text)],
-            EDIT_ADMIN: [MessageHandler(Filters.text, text)],
-            IMAGE_ADMIN: [MessageHandler(Filters.text, image)],
-            TEXT_ADMIN: [MessageHandler(Filters.text, text)],
-                        DESCRIPTION: [MessageHandler(Filters.text, description)],
-            DATE_ADMIN: [MessageHandler(Filters.text, date)],
-            NUMBER_ADMIN: [MessageHandler(Filters.text, number)],
-            CONFIRM_ADMIN: [MessageHandler(Filters.text, text)],
-            BEGIN_NOW_ADMIN: [MessageHandler(Filters.text, text)]
+            CHOOSE_ADMIN: [MessageHandler(Filters.text, choose_admin)],
+            EDIT_ADMIN: [MessageHandler(Filters.text, edit_admin)],
+            IMAGE_ADMIN: [MessageHandler(Filters.text, image_admin)],
+            TEXT_ADMIN: [MessageHandler(Filters.text, text_admin)],
+            NAME_ADMIN: [MessageHandler(Filters.text, name_admin)],
+            DATE_ADMIN: [MessageHandler(Filters.text, date_admin)],
+            NUMBER_ADMIN: [MessageHandler(Filters.text, number_admin)],
+            CONFIRM_ADMIN: [MessageHandler(Filters.text, confirm_admin)],
+            BEGIN_NOW_ADMIN: [MessageHandler(Filters.text, begin_giveaway)]
         },
         fallbacks=[CommandHandler('cancel', cancel)],
-    run_async=True  
     )
     dp.add_handler(adm_handler)
+    SHOW_GIVEAWAYS, ENTER_GIVEAWAY = range(2)
+    start_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start)],
+        states={
+            SHOW_GIVEAWAYS: [MessageHandler(Filters.text, text)],
+            ENTER_GIVEAWAY: [MessageHandler(Filters.text, text)]
+        },
+        fallbacks=[CommandHandler('cancel', cancel)],
+    )
+    dp.add_handler(start_handler)
 
     updater.start_polling()
     updater.idle()
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    uvicorn.run("main:main", host="0.0.0.0", port=8081, reload=True)
