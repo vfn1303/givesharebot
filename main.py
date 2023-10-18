@@ -404,7 +404,7 @@ def cancel(update, context):
 def main():
     # Запросы на создание таблиц (если они не существуют)
     create_users_table = """CREATE TABLE IF NOT EXISTS Users (
-        ID INT PRIMARY KEY,
+        ID INTEGER PRIMARY KEY,
         Username VARCHAR(255),
         Chat_ID INT,
         Subscribed BIT,
@@ -412,7 +412,7 @@ def main():
     );"""
 
     create_giveaways_table = """CREATE TABLE IF NOT EXISTS Giveaways (
-        ID INT PRIMARY KEY,
+        ID INTEGER PRIMARY KEY,
         Giveaway_Name VARCHAR(255),
         Giveaway_Desc VARCHAR(255),
         Giveaway_Image VARCHAR(255),
@@ -422,7 +422,7 @@ def main():
     );"""
 
     create_giveaway_participants_table = """CREATE TABLE IF NOT EXISTS Giveaway_Participants (
-        ID INT PRIMARY KEY,
+        ID INTEGER PRIMARY KEY,
         User_ID INT,
         Giveaway_ID INT,
         FOREIGN KEY (User_ID) REFERENCES Users(ID),
