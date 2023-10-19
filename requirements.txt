@@ -1,3 +1,2 @@
 python-telegram-bot==13.13
 python-dotenv==1.0.0 
-uvicorn
