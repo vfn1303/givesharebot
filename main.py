@@ -1,4 +1,3 @@
-import uvicorn
 
 from telegram.ext import (
     Updater,
@@ -595,4 +594,4 @@ def main():
     updater.idle()
 
 if __name__ == "__main__":
-    uvicorn.run("main:main", host="0.0.0.0", port=8081, reload=True)
+    main()
