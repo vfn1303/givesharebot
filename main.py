@@ -96,6 +96,10 @@ def update_name(name,id):
     cursor.execute(query, (name, id))
     conn.commit()
 
+def made_admin(id):
+    query = "UPDATE Users SET Admin = 1 WHERE Username = ?"
+    cursor.execute(query, (id,))
+    conn.commit()
 
 def check_admin_status(chat_id):
     query = "SELECT Admin FROM Users WHERE Chat_ID = ?"
@@ -162,7 +166,7 @@ def choose_admin(update,context):
         cancel(update, context)
         return ConversationHandler.END
     if user_input == 'Добавить админа':
-        update.message.reply_text('Отправьте ник админ без @.')
+        update.message.reply_text('Отправьте ник админ без @')
         return ADD_ADMIN
     if user_input == 'Вывести розыгрыши':
         #print(str(get_all_giveaways()))
@@ -187,7 +191,7 @@ def edit_admin(update,context):
                     ['Отмена']]
     adm_markup = ReplyKeyboardMarkup(adm_keyboard)
     update.message.reply_text(
-    "что делать с розыгрышем",
+    "Что делать с розыгрышем",
     reply_markup=adm_markup
     )
     return CHOOSE_EDIT
@@ -228,6 +232,7 @@ def confirm_admin(update,context):
         updater.bot.sendMessage(chat_id=winner_id,text='Поздравляем вы стали победителем розыгрыша. Приз можно забрать в ххххх.')
         for x in part:
             updater.bot.sendMessage(chat_id=x[0],text='На этот раз фортуна не была на вашей стороне. И вы не смогли стать победителем розыгрыша.')
+        update.message.reply_text('Победитель:'+str(winner[1]))
     else:
         cancel(update, context)
         return ConversationHandler.END
@@ -278,7 +283,7 @@ def number_admin(update,context):
 def add_admin(update,context):
     user_input = update.message.text
     if check_user_exists(user_input):
-        add_admin(user_input)
+        made_admin(user_input)
         update.message.reply_text('Админ добавлен')
         return ConversationHandler.END
     else:
@@ -301,15 +306,24 @@ def start(update, context):
     # Обработка параметров
     params = context.args
     if len(params) > 0:
-        giveaway = get_giveaway_by_id(int(params))
+        giveaway = get_giveaway_by_id(int(params[0]))
+        print(giveaway)
         if giveaway == None:
-            update.message.reply_text('текст меню + выберите розыгрышь',reply_markup=markup)
+            update.message.reply_text('''Привет! Это Kept bot!
+Для того чтобы принять участие в розыгрыше, выбери любой доступный.''',reply_markup=markup)
             return SHOW_GIVEAWAYS
         else:
-            context.user_data['giveaway_id'] = int(params)
-            return PRINT_GIVEAWAY
+            context.user_data['giveaway_id'] = int(params[0])
+            giv = get_giveaway_by_id(context.user_data['giveaway_id'])
+            keyboard = [["Участвовать"]]
+            markup = ReplyKeyboardMarkup(keyboard)
+            txt = '<b>'+str(giv[1])+'</b>\n\n'+ str(giv[2])+' <a href="'+str(giv[3])+'">&#8204;</a>'
+            #update.message.reply_text(text=txt, parse_mode="HTML", reply_markup=markup,disable_web_page_preview=False)
+            updater.bot.sendMessage(chat_id=user_id,text=txt, parse_mode="HTML", reply_markup=markup,disable_web_page_preview=False)
+            return ENTER_GIVEAWAY
     else:
-        update.message.reply_text('текст меню +  выберите розыгрышь',reply_markup=markup)
+        update.message.reply_text('''Привет! Это Kept bot!
+Для того чтобы принять участие в розыгрыше, выбери любой доступный.''',reply_markup=markup)
         return SHOW_GIVEAWAYS
 
 def show_giveaways(update, context):
@@ -318,34 +332,57 @@ def show_giveaways(update, context):
     giv = get_giveaway_by_id(context.user_data['giveaway_id'])
     keyboard = [["Участвовать"]]
     markup = ReplyKeyboardMarkup(keyboard)
-    txt = '<b>'+str(giv[1])+'</b>\n\n'+ str(giv[2])+' <a href="'+str(giv[3])+'"></a>'
+    txt = '<b>'+str(giv[1])+'</b>\n\n'+ str(giv[2])+' <a href="'+str(giv[3])+'">&#8204;</a>'
     update.message.reply_text(text=txt, parse_mode="HTML", reply_markup=markup,disable_web_page_preview=False)
     return ENTER_GIVEAWAY
  
 def print_giveaway(update, context):
+    user_id = update.message.from_user.id
     giv = get_giveaway_by_id(context.user_data['giveaway_id'])
-    print(giv)
+    #print(giv)
     keyboard = [["Участвовать"]]
     markup = ReplyKeyboardMarkup(keyboard)
-    txt = '<b>'+str(giv[1])+'</b>\n\n'+ str(giv[2])+' <a href="'+str(giv[3])+'"></a>'
-    update.message.reply_text(text=txt, parse_mode="HTML", reply_markup=markup,disable_web_page_preview=False)
+    txt = '<b>'+str(giv[1])+'</b>\n\n'+ str(giv[2])+' <a href="'+str(giv[3])+'">&#8204;</a>'
+    #update.message.reply_text(text=txt, parse_mode="HTML", reply_markup=markup,disable_web_page_preview=False)
+    updater.bot.sendMessage(chat_id=user_id,text=txt, parse_mode="HTML", reply_markup=markup,disable_web_page_preview=False)
     return ENTER_GIVEAWAY
 
 def enter_giveaway(update, context):
     id = update.message.from_user.id
-    chat_member = updater.bot.get_chat_member(chat_id = '@test_dsds', user_id = id)
-    print(chat_member)
-    if chat_member.status == 'member' or chat_member.status == 'owner' or chat_member.status == 'administrator' or chat_member.status == 'creator':
-        add_participants(id,context.user_data['giveaway_id'])
-        count = get_participants(context.user_data['giveaway_id'])
-        #print(count)
-        date = get_date(context.user_data['giveaway_id'])[0]
-        update.message.reply_text('Вы участвуете в розыгрыше от канала Созвездие СПБ.\nВ розыгрыше принимает участие '+str(len(count)) +' человек.\nВам присвоен уникальный номер: ' +str(id)
-                                  +'Результаты конкурса будут объявлены' +str(date))
-        return ConversationHandler.END
+    user_input = update.message.text
+    
+    #print(chat_member)
+    if user_input == "Участвовать":
+        chat_member = updater.bot.get_chat_member(chat_id = '@sozvezdiespb1', user_id = id)
+        if chat_member.status == 'member' or chat_member.status == 'owner' or chat_member.status == 'administrator' or chat_member.status == 'creator':
+            add_participants(id,context.user_data['giveaway_id'])
+            count = get_participants(context.user_data['giveaway_id'])
+            #print(count)
+            date = get_date(context.user_data['giveaway_id'])[0]
+            update.message.reply_text('Вы участвуете в розыгрыше от канала Созвездие СПБ.\nВ розыгрыше принимает участие '+str(len(count)) +' человек.\nВам присвоен уникальный номер: ' +str(id)
+                                    +'\nРезультаты конкурса будут объявлены' +str(date))
+            
+
+            giveaways = get_all_giveaways()
+            choose_keyboard = [] #обавить все названия розыгрышей в формате [id:]назвние
+            for x in giveaways:
+                choose_keyboard.append([str(x[0]) + ': ' + str(x[1])])
+            markup = ReplyKeyboardMarkup(choose_keyboard)
+            updater.bot.sendMessage(id,'''Привет! Это Kept bot!
+Для того чтобы принять участие в розыгрыше, выбери любой доступный.''',reply_markup=markup)
+            return SHOW_GIVEAWAYS
+        else:
+            update.message.reply_text('Для принятия участия в розыгрыше подпишитесь на канал Созвездие СПБ.')
+            return ENTER_GIVEAWAY
     else:
-        update.message.reply_text('Для принятия участия в розыгрыше подпишитесь на канал Созвездие СПБ.')
-        return ENTER_GIVEAWAY
+        giveaways = get_all_giveaways()
+        choose_keyboard = [] #обавить все названия розыгрышей в формате [id:]назвние
+        for x in giveaways:
+            choose_keyboard.append([str(x[0]) + ': ' + str(x[1])])
+        markup = ReplyKeyboardMarkup(choose_keyboard)
+        updater.bot.sendMessage(id,'''Привет! Это Kept bot!
+Для того чтобы принять участие в розыгрыше, выбери любой доступный.''',reply_markup=markup)
+        return SHOW_GIVEAWAYS
 
 def create_giveaway(update, context):
     user_id = update.message.from_user.id
@@ -458,7 +495,7 @@ def confirm(update, context):
         
         giveaway_id = get_all_giveaways()[-1][0]
         #TODO
-        update.message.reply_text('Розыгрышь создан, сылка t.me/ BOT/start='+str(giveaway_id))
+        update.message.reply_text('Розыгрышь создан, сылка t.me/kepttbot?start='+str(giveaway_id))
         #в крон
         #TODO
         return ConversationHandler.END
@@ -529,6 +566,7 @@ def main():
         states={
             CHOOSE_ADMIN: [MessageHandler(Filters.text, choose_admin)],
             CHOOSE_EDIT: [MessageHandler(Filters.text, choose_edit)],
+            ADD_ADMIN:[MessageHandler(Filters.text, add_admin)],
             EDIT_ADMIN: [MessageHandler(Filters.text, edit_admin)],
             IMAGE_ADMIN: [MessageHandler(Filters.text, image_admin)],
             TEXT_ADMIN: [MessageHandler(Filters.text, text_admin)],
